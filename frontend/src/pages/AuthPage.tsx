@@ -6,10 +6,12 @@ interface AuthActions {
   googleOAuthAPI?: string;
 }
 
+const backend = import.meta.env.VITE_BACKEND_BASE_URL;
+
 function AuthPage({
   actionName,
   actionPath,
-  googleOAuthAPI = "/api/auth/google",
+  googleOAuthAPI = `${backend}/api/auth/google`,
 }: AuthActions) {
   return (
     <div className="grow flex items-center w-screen justify-center">

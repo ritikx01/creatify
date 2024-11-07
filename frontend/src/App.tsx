@@ -12,20 +12,21 @@ import AuthPage from "./pages/AuthPage";
 import { NotificationProvider } from "./components/NotificationProvider";
 import Settings from "./pages/Settings";
 
+const backend = import.meta.env.VITE_BACKEND_BASE_URL;
+
 const paths: Paths[] = [
   { pathName: "Home", relativePath: "/" },
   { pathName: "Create", relativePath: "/create", highlight: true },
   // {pathName: 'Login', relativePath:'/login'}
 ];
-
 const AuthActions = {
   SignUp: {
     actionName: "Sign Up",
-    actionPath: "/api/sign-up",
+    actionPath: `${backend}/api/sign-up`,
   },
   Login: {
     actionName: "Login",
-    actionPath: "/api/login",
+    actionPath: `${backend}/api/login`,
   },
 };
 
