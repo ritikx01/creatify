@@ -12,6 +12,15 @@ interface InputNumberInterface {
   onChange: (value: number) => void;
 }
 
+interface CreateRequestBody {
+  prompt: string;
+  width?: number;
+  height?: number;
+  num_inference_steps?: number;
+  seed?: number;
+  randomize_seed?: boolean;
+}
+
 function InputNumber({
   id,
   min,
@@ -52,6 +61,32 @@ function Loading() {
     </div>
   );
 }
+async function readableStreamToJSON(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader();
+  let buffer = "";
+  const events = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += new TextDecoder().decode(value);
+    const lines = buffer.split("\n");
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        try {
+          const jsonStr = line.slice(6);
+          const jsonData = JSON.parse(jsonStr);
+          events.push(jsonData);
+        } catch (e) {
+          console.error("Failed to parse JSON:", e);
+        }
+      }
+    }
+  }
+
+  return events;
+}
 
 function CreatePage() {
   const [inputValue, setInputValue] = useState<string>("");
@@ -66,6 +101,59 @@ function CreatePage() {
   const [loading, setLoading] = useState<boolean>(false);
 
   const { showNotification } = useNotification();
+  async function createGradio(
+    params: CreateRequestBody,
+  ): Promise<string | undefined> {
+    try {
+      const client = await fetch(
+        "https://black-forest-labs-flux-1-schnell.hf.space/call/infer",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            data: [
+              params.prompt,
+              params.seed,
+              false,
+              params.width,
+              params.height,
+              params.num_inference_steps,
+            ],
+          }),
+        },
+      );
+
+      const { event_id } = await client.json();
+
+      const response2 = await fetch(
+        `https://black-forest-labs-flux-1-schnell.hf.space/call/infer/${event_id}`,
+      );
+      if (!response2.body) {
+        throw new Error("Response body is null");
+      }
+
+      const events = await readableStreamToJSON(response2.body);
+      const imageURL = events[0][0]?.url || "";
+
+      if (!imageURL) {
+        return undefined;
+      }
+
+      try {
+        new URL(imageURL);
+        return imageURL;
+      } catch (error) {
+        console.error("Gradio result error:", error);
+        throw error;
+      }
+    } catch (error) {
+      console.error("Gradio error:", error);
+      throw error;
+    }
+  }
+
   async function handleClick(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
@@ -73,43 +161,55 @@ function CreatePage() {
       setSeed(Math.floor(Math.random() * 4294967295));
     }
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_BACKEND_BASE_URL}/api/create`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-type": "application/json",
-          },
-          body: JSON.stringify({
-            prompt: inputValue,
-            num_inference_steps: numInferenceSteps,
-            height: imageHeight,
-            width: imageWidth,
-            seed: seed,
-          }),
-        },
-      );
-
-      const data = await response.json();
-      if (!response.ok) {
-        showNotification(data.msg || "Network error", "error");
-      }
-      const formatImageSource = (responseData: string) => {
-        try {
-          new URL(responseData);
-          setImageData(responseData);
-        } catch {
-          setImageData(`data:image/png;base64,${responseData}`);
-          return false;
-        }
+      const processedParams = {
+        prompt: inputValue,
+        num_inference_steps: numInferenceSteps,
+        height: imageHeight,
+        width: imageWidth,
+        seed: seed,
       };
-      formatImageSource(data.image);
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_BACKEND_BASE_URL}/api/create`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-type": "application/json",
+            },
+            body: JSON.stringify(processedParams),
+          },
+        );
+
+        const data = await response.json();
+        formatImageSource(data.image);
+      } catch (e) {
+        try {
+          const image = await createGradio(processedParams);
+          const data = { image: image };
+          formatImageSource(data.image || "");
+        } catch (error) {
+          console.log("Gradio error:", error);
+          showNotification("Network error", "error");
+          setLoading(false);
+          return;
+        }
+      }
     } catch (error) {
       console.error("Error:", error);
+      showNotification("Network error", "error");
     }
     setLoading(false);
   }
+  const formatImageSource = (responseData: string) => {
+    try {
+      new URL(responseData);
+      setImageData(responseData);
+    } catch {
+      setImageData(`data:image/png;base64,${responseData}`);
+      return false;
+    }
+  };
   return (
     <div className="grow flex">
       <div className="w-[650px] p-14 border-r-primaryBorder dark:border-r-primaryBorderDark border-r-2">
