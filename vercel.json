@@ -5,22 +5,28 @@
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "distDir": "frontend/dist"
+        "distDir": "dist",
+        "installCommand": "npm ci",
+        "buildCommand": "npm run build"
       }
     },
     {
-      "src": "backend/src/index.ts",
-      "use": "@vercel/node"
+      "src": "backend/package.json",
+      "use": "@vercel/node",
+      "config": {
+        "installCommand": "npm ci",
+        "buildCommand": "npm run build"
+      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/backend/src/index.ts"
+      "dest": "backend/src/index.ts"
     },
     {
-      "src": "/(.*)",
-      "dest": "/frontend/dist/$1"
+      "src": "(.*)",
+      "dest": "frontend/dist/$1"
     }
   ]
 }
