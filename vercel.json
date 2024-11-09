@@ -1,21 +1,21 @@
 {
   "version": 2,
+  "buildCommand": "npm run install:all && npm run build",
+  "outputDirectory": "frontend/dist",
   "builds": [
     {
       "src": "frontend/package.json",
       "use": "@vercel/static-build",
       "config": {
         "distDir": "dist",
-        "installCommand": "npm ci",
-        "buildCommand": "npm run build"
+        "buildCommand": "cd frontend && npm ci && npm run build"
       }
     },
     {
-      "src": "backend/package.json",
+      "src": "backend/src/index.ts",
       "use": "@vercel/node",
       "config": {
-        "installCommand": "npm ci",
-        "buildCommand": "npm run build"
+        "includeFiles": ["backend/**"]
       }
     }
   ],
@@ -25,7 +25,10 @@
       "dest": "backend/src/index.ts"
     },
     {
-      "src": "(.*)",
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
       "dest": "frontend/dist/$1"
     }
   ]
